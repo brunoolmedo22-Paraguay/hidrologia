@@ -1684,10 +1684,12 @@ def render_page_mathias():
         unsafe_allow_html=True,
     )
 
-    # Recompute com valores dinâmicos do slider para memorial
-    _C_mem  = calc_C_medio(st.session_state["ma_pct_urban"],
-                            st.session_state["ma_C_urb"],
-                            st.session_state["ma_C_rur"])
+    # ── Recompute para o memorial (valores dinâmicos do slider) ──────
+    _C_mem = calc_C_medio(
+        st.session_state["ma_pct_urban"],
+        st.session_state["ma_C_urb"],
+        st.session_state["ma_C_rur"],
+    )
     _Q_mem  = calc_Q_racional(_C_mem, _i, _MA_A)
     _f_urb  = st.session_state["ma_pct_urban"] / 100.0
     _f_rur  = 1.0 - _f_urb
@@ -1695,75 +1697,102 @@ def render_page_mathias():
     _S0385  = _MA_S ** 0.385
     _Ta     = _MA_T ** _MA_a
     _tcb_c  = (_tc + _MA_b) ** _MA_c
+    _CiA    = _C_mem * _i * _MA_A
 
     col_mem1, col_mem2 = st.columns(2, gap="large")
 
+    # ── PASSO 1 — Kirpich ─────────────────────────────────────────────
     with col_mem1:
-        # PASSO 1
         st.markdown('<div class="step-box">', unsafe_allow_html=True)
-        st.markdown('<div class="step-title">① Tempo de Concentração — Kirpich (1940)</div>', unsafe_allow_html=True)
-        st.latex(r"t_c = 0{,}0195 \cdot rac{L^{0{,}77}}{S^{0{,}385}}")
-        st.latex(
-            rf"t_c = 0{{,}}0195 \cdot rac{{{_MA_L:.0f}^{{0{{,}}77}}}}{{{_MA_S}^{{0{{,}}385}}}}"
+        st.markdown(
+            '<div class="step-title">① Tempo de Concentração — Kirpich (1940)</div>',
+            unsafe_allow_html=True,
         )
         st.latex(
-            rf"t_c = 0{{,}}0195 \cdot rac{{{_L077:.2f}}}{{{_S0385:.4f}}}"
+            r"t_c = 0{,}0195 \cdot \frac{L^{0{,}77}}{S^{0{,}385}}"
         )
-        st.latex(rf"t_c = {_tc:.4f} pprox {_tc:.2f} 	ext{{ min}}")
+        st.latex(
+            r"t_c = 0{,}0195 \cdot \frac{9780^{0{,}77}}{0{,}015^{0{,}385}}"
+        )
+        st.latex(
+            rf"t_c = 0{{,}}0195 \cdot \frac{{{_L077:.2f}}}{{{_S0385:.4f}}}"
+        )
+        st.latex(
+            rf"t_c = {_tc:.4f} \approx {_tc:.2f} \text{{ min}}"
+        )
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # PASSO 2
+        # ── PASSO 2 — IDF ─────────────────────────────────────────────
         st.markdown('<div class="step-box">', unsafe_allow_html=True)
-        st.markdown('<div class="step-title">② Intensidade de Chuva — IDF Foz do Iguaçu (PLUVIO 2.1)</div>', unsafe_allow_html=True)
-        st.latex(r"i = rac{K \cdot T^{a}}{(t_c + b)^{c}}")
-        st.latex(
-            rf"i = rac{{{_MA_K} \cdot {_MA_T}^{{{_MA_a}}}}}{{{{{_tc:.2f}}} + {_MA_b}}}^{{{_MA_c}}}"
+        st.markdown(
+            '<div class="step-title">② Intensidade — IDF Foz do Iguaçu (PLUVIO 2.1)</div>',
+            unsafe_allow_html=True,
         )
         st.latex(
-            rf"i = rac{{{_MA_K} \cdot {_Ta:.4f}}}{{{_tcb_c:.4f}}}"
+            r"i = \frac{K \cdot T^{a}}{(t_c + b)^{c}}"
         )
-        st.latex(rf"i = {_i:.4f} pprox {_i:.2f} 	ext{{ mm/h}}")
+        st.latex(
+            r"i = \frac{2853{,}479 \cdot 10^{0{,}125}}{(116{,}09 + 25{,}674)^{0{,}925}}"
+        )
+        st.latex(
+            rf"i = \frac{{2853{{,}}479 \cdot {_Ta:.4f}}}{{{_tcb_c:.4f}}}"
+        )
+        st.latex(
+            rf"i = {_i:.4f} \approx {_i:.2f} \text{{ mm/h}}"
+        )
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── PASSO 3 — C médio  ────────────────────────────────────────────
     with col_mem2:
-        # PASSO 3
         st.markdown('<div class="step-box">', unsafe_allow_html=True)
-        st.markdown('<div class="step-title">③ Coeficiente de Escoamento Médio — C ponderado</div>', unsafe_allow_html=True)
-        st.latex(r"C_{med} = C_{urb} \cdot f_{urb} + C_{rur} \cdot f_{rur}")
+        st.markdown(
+            '<div class="step-title">③ Coeficiente de Escoamento Médio — C ponderado</div>',
+            unsafe_allow_html=True,
+        )
+        st.latex(
+            r"C_{med} = C_{urb} \cdot f_{urb} + C_{rur} \cdot f_{rur}"
+        )
         st.latex(
             rf"C_{{med}} = {st.session_state['ma_C_urb']:.2f} \cdot {_f_urb:.2f}"
             rf" + {st.session_state['ma_C_rur']:.2f} \cdot {_f_rur:.2f}"
         )
         st.latex(
-            rf"C_{{med}} = {st.session_state['ma_C_urb']*_f_urb:.4f}"
-            rf" + {st.session_state['ma_C_rur']*_f_rur:.4f}"
+            rf"C_{{med}} = {st.session_state['ma_C_urb'] * _f_urb:.4f}"
+            rf" + {st.session_state['ma_C_rur'] * _f_rur:.4f}"
         )
         st.latex(rf"C_{{med}} = {_C_mem:.4f}")
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # PASSO 4
+        # ── PASSO 4 — Método Racional ─────────────────────────────────
         st.markdown('<div class="step-box">', unsafe_allow_html=True)
-        st.markdown('<div class="step-title">④ Vazão de Pico — Método Racional</div>', unsafe_allow_html=True)
-        st.latex(r"Q = rac{C_{med} \cdot i \cdot A}{3{,}6} \quad [m^3/s]")
-        st.latex(
-            rf"Q = rac{{{_C_mem:.4f} \cdot {_i:.4f} \cdot {_MA_A}}}{{{3.6}}}"
+        st.markdown(
+            '<div class="step-title">④ Vazão de Pico — Método Racional</div>',
+            unsafe_allow_html=True,
         )
         st.latex(
-            rf"Q = rac{{{_C_mem * _i * _MA_A:.4f}}}{{3{{,}}6}}"
+            r"Q = \frac{C_{med} \cdot i \cdot A}{3{,}6} \quad \left[m^3/s\right]"
         )
-        st.latex(rf"\boxed{{Q = {_Q_mem:.4f} \approx {_Q_mem:.2f} \; m^3/s}}")
+        st.latex(
+            rf"Q = \frac{{{_C_mem:.4f} \times {_i:.4f} \times {_MA_A}}}{{{3.6}}}"
+        )
+        st.latex(
+            rf"Q = \frac{{{_CiA:.4f}}}{{3{{,}}6}}"
+        )
+        st.latex(
+            rf"\boxed{{Q = {_Q_mem:.4f} \approx {_Q_mem:.2f} \; m^3/s}}"
+        )
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Resultado final destacado
+    # ── Resultado final destacado ──────────────────────────────────────
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown(
-        f'<div class="result-box">' +
-        f'<div class="label">Bacia do Rio Mathias Almada · Resultado Final · Tr = {_MA_T} anos</div>' +
-        f'<div class="value">{_Q_mem:.2f}<span class="unit">m³/s</span></div>' +
-        f'<div style="font-size:13px;opacity:0.85;margin-top:10px;">' +
-        f'tc = {_tc:.2f} min &nbsp;|&nbsp; i = {_i:.2f} mm/h &nbsp;|&nbsp; ' +
-        f'C = {_C_mem:.3f} &nbsp;|&nbsp; A = {_MA_A} km² &nbsp;|&nbsp; ' +
-        f'IDF: Foz do Iguaçu (PLUVIO 2.1)' +
+        f'<div class="result-box">'
+        f'<div class="label">Bacia do Rio Mathias Almada · Resultado Final · Tr = {_MA_T} anos</div>'
+        f'<div class="value">{_Q_mem:.2f}<span class="unit">m³/s</span></div>'
+        f'<div style="font-size:13px;opacity:0.85;margin-top:10px;">'
+        f'tc = {_tc:.2f} min &nbsp;|&nbsp; i = {_i:.2f} mm/h &nbsp;|&nbsp; '
+        f'C = {_C_mem:.3f} &nbsp;|&nbsp; A = {_MA_A} km² &nbsp;|&nbsp; '
+        f'IDF: Foz do Iguaçu (PLUVIO 2.1)'
         f'</div></div>',
         unsafe_allow_html=True,
     )
