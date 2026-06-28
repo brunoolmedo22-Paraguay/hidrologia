@@ -234,6 +234,30 @@ section[data-testid="stSidebar"] > div {{
     white-space: nowrap;
 }}
 
+/* ── botões de nav (sidebar) — estilo referência ─────── */
+section[data-testid="stSidebar"] button {{
+    border-radius: 10px !important;
+    font-size: 14px !important;
+    letter-spacing: -0.1px !important;
+    transition: all 0.15s ease !important;
+}}
+section[data-testid="stSidebar"] button[kind="secondary"] {{
+    background: rgba(14,165,233,0.06) !important;
+    border: none !important;
+    color: {ACCENT_D} !important;
+    font-weight: 500 !important;
+}}
+section[data-testid="stSidebar"] button[kind="secondary"]:hover {{
+    background: rgba(14,165,233,0.12) !important;
+}}
+section[data-testid="stSidebar"] button[kind="primary"] {{
+    background: linear-gradient(135deg, {ACCENT}, {ACCENT_D}) !important;
+    border: none !important;
+    box-shadow: 0 3px 12px rgba(14,165,233,0.35) !important;
+    font-weight: 600 !important;
+    color: white !important;
+}}
+
 /* ── tabs — aparência limpa ────────────────────────── */
 button[data-baseweb="tab"] {{
     font-weight: 600 !important;
@@ -244,20 +268,38 @@ button[data-baseweb="tab"] {{
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# DADOS IDF POR CIDADE — Paraná (SUDERHSA)
+# ──────────────────────────────────────────────────────────────────────────────
+DADOS_CIDADES_IDF = {
+    "Cascavel":      {"K": 1062.92,  "a": 0.141, "b": 5.0,    "c": 0.776},
+    "Curitiba":      {"K": 5949.995, "a": 0.217, "b": 26.0,   "c": 1.150},
+    "Foz do Iguaçu": {"K": 2853.479, "a": 0.125, "b": 25.674, "c": 0.925},
+    "Guarapuava":    {"K": 1039.68,  "a": 0.171, "b": 10.0,   "c": 0.799},
+    "Londrina":      {"K": 3132.560, "a": 0.093, "b": 30.0,   "c": 0.939},
+    "Medianeira":    {"K": 2886.690, "a": 0.124, "b": 26.0,   "c": 0.927},
+    "Paranaguá":     {"K": 2052.13,  "a": 0.157, "b": 23.246, "c": 0.876},
+    "Pato Branco":   {"K": 879.441,  "a": 0.152, "b": 9.0,    "c": 0.732},
+    "Ponta Grossa":  {"K": 1902.388, "a": 0.152, "b": 21.0,   "c": 0.893},
+    "Personalizado": {"K": 1062.92,  "a": 0.141, "b": 5.0,    "c": 0.776},
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
 # SESSION STATE — inicialização das variáveis compartilhadas
 # ──────────────────────────────────────────────────────────────────────────────
 defaults = {
-    "area_km2":   1.2,
-    "L_m":        1795.0,
-    "S":          0.02,
-    "T_anos":     10,
-    "K":          1062.92,
-    "a_idf":      0.141,
-    "b_idf":      5.0,
-    "c_idf":      0.776,
-    "pct_urban":  30,
-    "C_urb":      0.90,
-    "C_rur":      0.40,
+    "area_km2":    1.2,
+    "L_m":         1795.0,
+    "S":           0.02,
+    "T_anos":      10,
+    "K":           1062.92,
+    "a_idf":       0.141,
+    "b_idf":       5.0,
+    "c_idf":       0.776,
+    "pct_urban":   30,
+    "C_urb":       0.90,
+    "C_rur":       0.40,
+    "cidade_idf":  "Cascavel",
+    "pagina_ativa": "estudo",
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -265,8 +307,21 @@ for k, v in defaults.items():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# SIDEBAR
+# SIDEBAR — nav_button igual ao estilo da referência
 # ──────────────────────────────────────────────────────────────────────────────
+def nav_button(label: str, key_val: str):
+    """Botão de navegação com estado primário/secundário — igual à referência."""
+    active = st.session_state.get("pagina_ativa") == key_val
+    if st.sidebar.button(
+        label,
+        type="primary" if active else "secondary",
+        key=f"nav_{key_val}",
+        use_container_width=True,
+    ):
+        st.session_state["pagina_ativa"] = key_val
+        st.rerun()
+
+
 with st.sidebar:
     st.markdown("""
     <div class="sb-brand">
@@ -279,15 +334,8 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.markdown('<span class="sb-label">Navegação</span>', unsafe_allow_html=True)
-
-    pagina = st.radio(
-        label="Selecione a página",
-        options=[
-            "🗺️  Estudo de Caso: Bacia do Paraná",
-            "📐  Simulador Hidrológico",
-        ],
-        label_visibility="collapsed",
-    )
+    nav_button("🗺️  Estudo de Caso", "estudo")
+    nav_button("📐  Simulador Hidrológico", "simulador")
 
     st.markdown("---")
     st.markdown("""
@@ -296,8 +344,8 @@ with st.sidebar:
         Fórmula: Q = C·i·A / 3,6<br><br>
         <b style="color:#64748b;">Tempo de Concentração</b><br>
         Kirpich (1940)<br><br>
-        <b style="color:#64748b;">IDF — Cascavel/PR</b><br>
-        SUDERHSA (coeficientes locais)
+        <b style="color:#64748b;">IDF — PR (SUDERHSA)</b><br>
+        9 cidades disponíveis
     </div>
     """, unsafe_allow_html=True)
 
@@ -755,14 +803,48 @@ def render_page_simulador():
                             unsafe_allow_html=True)
 
         # ── Coeficientes IDF ────────────────────────────────────────────
-        st.markdown('<div class="section-divider"><hr/><span>Coeficientes da equação IDF — Cascavel/PR</span><hr/></div>',
+        st.markdown('<div class="section-divider"><hr/><span>Coeficientes da equação IDF — Paraná (SUDERHSA)</span><hr/></div>',
                     unsafe_allow_html=True)
 
         st.markdown("""
-        Os coeficientes abaixo são derivados do ajuste estatístico de séries pluviográficas
-        históricas da estação de Cascavel (SUDERHSA/SIMEPAR). Eles podem ser editados para
-        outras cidades do Paraná — consulte o Atlas Pluviométrico do estado.
+        Selecione uma cidade do Paraná para carregar automaticamente os coeficientes IDF
+        calibrados pela SUDERHSA/SIMEPAR. Escolha **Personalizado** para inserir valores
+        manualmente para qualquer outra localidade.
         """)
+
+        # ── Selectbox de cidade ─────────────────────────────────────────
+        cidades_opcoes = list(DADOS_CIDADES_IDF.keys())
+        idx_cidade = cidades_opcoes.index(st.session_state["cidade_idf"])                      if st.session_state["cidade_idf"] in cidades_opcoes else 0
+
+        cidade_sel = st.selectbox(
+            "📍 Cidade de referência (IDF)",
+            options=cidades_opcoes,
+            index=idx_cidade,
+            key="cidade_idf",
+            help="Selecione a cidade para carregar os coeficientes IDF calibrados. "
+                 "Escolha Personalizado para editar livremente.",
+        )
+
+        # Ao mudar de cidade (exceto Personalizado), atualiza K/a/b/c no session_state
+        if cidade_sel != "Personalizado":
+            coefs = DADOS_CIDADES_IDF[cidade_sel]
+            st.session_state["K"]     = coefs["K"]
+            st.session_state["a_idf"] = coefs["a"]
+            st.session_state["b_idf"] = coefs["b"]
+            st.session_state["c_idf"] = coefs["c"]
+
+        disabled_inputs = (cidade_sel != "Personalizado")
+        if disabled_inputs:
+            st.markdown(
+                '<div class="alert-info">✅ Coeficientes carregados automaticamente para <b>' +
+                cidade_sel + '</b>. Selecione <b>Personalizado</b> para editar manualmente.</div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown(
+                '<div class="alert-warning">✏️ Modo personalizado — insira os coeficientes manualmente abaixo.</div>',
+                unsafe_allow_html=True,
+            )
 
         col_k, col_a, col_b, col_c = st.columns(4)
         with col_k:
@@ -770,28 +852,32 @@ def render_page_simulador():
                 "K", min_value=1.0, max_value=9999.0,
                 value=st.session_state["K"], step=1.0, format="%.2f",
                 key="K",
-                help="Coeficiente de escala da equação IDF."
+                help="Coeficiente de escala da equação IDF.",
+                disabled=disabled_inputs,
             )
         with col_a:
             a_idf = st.number_input(
                 "a", min_value=0.001, max_value=1.0,
                 value=st.session_state["a_idf"], step=0.001, format="%.3f",
                 key="a_idf",
-                help="Expoente do período de retorno."
+                help="Expoente do período de retorno.",
+                disabled=disabled_inputs,
             )
         with col_b:
             b_idf = st.number_input(
                 "b", min_value=0.0, max_value=100.0,
                 value=st.session_state["b_idf"], step=0.5, format="%.1f",
                 key="b_idf",
-                help="Coeficiente de ajuste da duração (minutos)."
+                help="Coeficiente de ajuste da duração (minutos).",
+                disabled=disabled_inputs,
             )
         with col_c:
             c_idf = st.number_input(
                 "c", min_value=0.1, max_value=2.0,
                 value=st.session_state["c_idf"], step=0.001, format="%.3f",
                 key="c_idf",
-                help="Expoente de decaimento da intensidade com a duração."
+                help="Expoente de decaimento da intensidade com a duração.",
+                disabled=disabled_inputs,
             )
 
         st.markdown("**Equação IDF utilizada:**")
@@ -1209,7 +1295,7 @@ def render_page_simulador():
 # ──────────────────────────────────────────────────────────────────────────────
 # ROTEADOR PRINCIPAL
 # ──────────────────────────────────────────────────────────────────────────────
-if "Estudo de Caso" in pagina:
+if st.session_state.get("pagina_ativa", "estudo") == "estudo":
     render_page_estudo()
 else:
     render_page_simulador()
