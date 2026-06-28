@@ -300,6 +300,10 @@ defaults = {
     "C_rur":       0.40,
     "cidade_idf":  "Cascavel",
     "pagina_ativa": "estudo",
+    # ── Bacia Mathias Almada ───────────────────────────────────────────
+    "ma_pct_urban": 35,
+    "ma_C_urb":     0.90,
+    "ma_C_rur":     0.40,
 }
 for k, v in defaults.items():
     if k not in st.session_state:
@@ -336,6 +340,7 @@ with st.sidebar:
     st.markdown('<span class="sb-label">Navegação</span>', unsafe_allow_html=True)
     nav_button("🗺️  Estudo de Caso", "estudo")
     nav_button("📐  Simulador Hidrológico", "simulador")
+    nav_button("🏞️  B. Mathias Almada", "mathias")
 
     st.markdown("---")
     st.markdown("""
@@ -345,7 +350,7 @@ with st.sidebar:
         <b style="color:#64748b;">Tempo de Concentração</b><br>
         Kirpich (1940)<br><br>
         <b style="color:#64748b;">IDF — PR (SUDERHSA)</b><br>
-        9 cidades disponíveis
+        9 cidades · software PLUVIO
     </div>
     """, unsafe_allow_html=True)
 
@@ -1292,10 +1297,496 @@ def render_page_simulador():
             )
 
 
+
+# ──────────────────────────────────────────────────────────────────────────────
+# PAGE 3 — BACIA DO RIO MATHIAS ALMADA (Estudo de Caso Técnico)
+# ──────────────────────────────────────────────────────────────────────────────
+# Constantes fixas da bacia
+_MA_A    = 30.6      # km²
+_MA_L    = 9780.0    # m
+_MA_S    = 0.015     # m/m
+_MA_T    = 10        # anos
+# IDF Foz do Iguaçu (PLUVIO 2.1)
+_MA_K    = 2853.479
+_MA_a    = 0.125
+_MA_b    = 25.674
+_MA_c    = 0.925
+
+GITHUB_RAW = (
+    "https://raw.githubusercontent.com/"
+    "brunoolmedo/utopia/main/bacia.png"   # ajuste para o repo correto se necessário
+)
+
+
+def render_page_mathias():
+    # ── chip + títulos ─────────────────────────────────────────────────
+    st.markdown(
+        '<div class="chip">🏞️ Estudo de Caso Técnico</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="page-title">Bacia Hidrográfica do Rio Mathias Almada</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="page-subtitle">' +
+        "Dimensionamento hidrológico pelo Método Racional · "
+        "Coeficientes IDF provenientes do software <b>PLUVIO 2.1</b> (DAEE/FCTH) "
+        "para a estação de <b>Foz do Iguaçu</b>." +
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ══════════════════════════════════════════════════════════════════
+    # SEÇÃO A — IMAGEM + KPIs FIXOS
+    # ══════════════════════════════════════════════════════════════════
+    col_img, col_kpis = st.columns([1.15, 1], gap="large")
+
+    with col_img:
+        st.markdown(
+            '<div class="section-divider"><hr/><span>Delimitação da Bacia</span><hr/></div>',
+            unsafe_allow_html=True,
+        )
+        try:
+            import urllib.request, base64
+            req = urllib.request.Request(
+                GITHUB_RAW,
+                headers={"User-Agent": "Mozilla/5.0"},
+            )
+            img_bytes = urllib.request.urlopen(req, timeout=5).read()
+            b64 = base64.b64encode(img_bytes).decode()
+            st.markdown(
+                f'<div style="border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;'
+                f'box-shadow:0 4px 20px rgba(14,165,233,0.08);">' 
+                f'<img src="data:image/png;base64,{b64}" ' 
+                f'style="width:100%;display:block;" /></div>',
+                unsafe_allow_html=True,
+            )
+        except Exception:
+            # fallback local
+            from pathlib import Path
+            p = Path(__file__).parent / "bacia.png"
+            if p.exists():
+                import base64
+                b64 = base64.b64encode(p.read_bytes()).decode()
+                st.markdown(
+                    f'<div style="border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;'
+                    f'box-shadow:0 4px 20px rgba(14,165,233,0.08);">' 
+                    f'<img src="data:image/png;base64,{b64}" ' 
+                    f'style="width:100%;display:block;" /></div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    '<div class="info-card" style="text-align:center;height:220px;' +
+                    'display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;">' +
+                    '<span style="font-size:48px;">🗺️</span>' +
+                    '<span style="color:#64748b;font-size:13px;">bacia.png não encontrada</span></div>',
+                    unsafe_allow_html=True,
+                )
+        st.markdown(
+            '<p style="font-size:11px;color:#94a3b8;text-align:center;margin-top:6px;">' +
+            "Figura 1 — Delimitação da Bacia Hidrográfica do Rio Mathias Almada." +
+            '</p>',
+            unsafe_allow_html=True,
+        )
+
+    with col_kpis:
+        st.markdown(
+            '<div class="section-divider"><hr/><span>Parâmetros de Projeto</span><hr/></div>',
+            unsafe_allow_html=True,
+        )
+
+        # KPIs em grid 2×2 + linha IDF
+        kpi_style = (
+            "background:#ffffff;border:1px solid #e2e8f0;border-radius:14px;"
+            "padding:18px 20px;box-shadow:0 2px 8px rgba(14,165,233,0.05);"
+            "display:flex;flex-direction:column;gap:4px;height:100%;"
+        )
+        label_style = "font-size:10.5px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#64748b;"
+        value_style = "font-size:28px;font-weight:900;color:#0f172a;letter-spacing:-0.5px;line-height:1;"
+        unit_style  = "font-size:12px;font-weight:600;color:#0ea5e9;margin-top:2px;"
+
+        r1c1, r1c2 = st.columns(2)
+        with r1c1:
+            st.markdown(
+                f'<div style="{kpi_style}">' +
+                f'<span style="{label_style}">Área da Bacia</span>' +
+                f'<span style="{value_style}">30,6</span>' +
+                f'<span style="{unit_style}">km²</span>' +
+                '</div>', unsafe_allow_html=True
+            )
+        with r1c2:
+            st.markdown(
+                f'<div style="{kpi_style}">' +
+                f'<span style="{label_style}">Talvegue Principal</span>' +
+                f'<span style="{value_style}">9,78</span>' +
+                f'<span style="{unit_style}">km</span>' +
+                '</div>', unsafe_allow_html=True
+            )
+
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+        r2c1, r2c2 = st.columns(2)
+        with r2c1:
+            st.markdown(
+                f'<div style="{kpi_style}">' +
+                f'<span style="{label_style}">Declividade Média</span>' +
+                f'<span style="{value_style}">0,015</span>' +
+                f'<span style="{unit_style}">m/m</span>' +
+                '</div>', unsafe_allow_html=True
+            )
+        with r2c2:
+            st.markdown(
+                f'<div style="{kpi_style}">' +
+                f'<span style="{label_style}">Período de Retorno</span>' +
+                f'<span style="{value_style}">10</span>' +
+                f'<span style="{unit_style}">anos</span>' +
+                '</div>', unsafe_allow_html=True
+            )
+
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+        r3c1, r3c2 = st.columns(2)
+        with r3c1:
+            st.markdown(
+                f'<div style="{kpi_style}">' +
+                f'<span style="{label_style}">Área Urbanizada</span>' +
+                f'<span style="{value_style}">35</span>' +
+                f'<span style="{unit_style}">% da bacia</span>' +
+                '</div>', unsafe_allow_html=True
+            )
+        with r3c2:
+            st.markdown(
+                f'<div style="{kpi_style};border-left:4px solid #0ea5e9;">' +
+                f'<span style="{label_style}">Estação IDF</span>' +
+                f'<span style="font-size:17px;font-weight:800;color:#0f172a;line-height:1.2;">Foz do Iguaçu</span>' +
+                f'<span style="{unit_style}">PLUVIO 2.1 · DAEE/FCTH</span>' +
+                '</div>', unsafe_allow_html=True
+            )
+
+        st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
+
+        # Coeficientes IDF como sub-row
+        st.markdown(
+            '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;' +
+            'padding:14px 18px;display:flex;gap:0;justify-content:space-between;">' +
+            _kpi_idf("K", "2853,479") +
+            _kpi_idf("a", "0,125") +
+            _kpi_idf("b", "25,674") +
+            _kpi_idf("c", "0,925") +
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            '<p style="font-size:10.5px;color:#94a3b8;margin-top:5px;">' +
+            "Coeficientes da equação IDF obtidos via software <b>PLUVIO 2.1</b> (DAEE/FCTH) · "
+            "Equação: i = K·T<sup>a</sup> / (t<sub>c</sub>+b)<sup>c</sup>" +
+            '</p>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════════════════════════
+    # SEÇÃO B — CONTROLES INTERATIVOS
+    # ══════════════════════════════════════════════════════════════════
+    st.markdown(
+        '<div class="section-divider"><hr/><span>Simulação de Cenários — Uso do Solo</span><hr/></div>',
+        unsafe_allow_html=True,
+    )
+
+    col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([2, 1, 1])
+    with col_ctrl1:
+        ma_pct = st.slider(
+            "Percentagem de Área Urbanizada (%)",
+            min_value=0, max_value=100,
+            value=st.session_state["ma_pct_urban"],
+            step=1, key="ma_pct_urban",
+            help="Varie para analisar o impacto da urbanização na vazão de pico.",
+        )
+    with col_ctrl2:
+        ma_C_urb = st.number_input(
+            "C Urbano", min_value=0.0, max_value=1.0,
+            value=st.session_state["ma_C_urb"],
+            step=0.01, format="%.2f", key="ma_C_urb",
+            help="Coeficiente de escoamento para área urbanizada.",
+        )
+    with col_ctrl3:
+        ma_C_rur = st.number_input(
+            "C Rural", min_value=0.0, max_value=1.0,
+            value=st.session_state["ma_C_rur"],
+            step=0.01, format="%.2f", key="ma_C_rur",
+            help="Coeficiente de escoamento para área rural/vegetada.",
+        )
+
+    # ── Cálculos centrais ───────────────────────────────────────────
+    _tc  = calc_tc_kirpich(_MA_L, _MA_S)
+    _i   = calc_idf(_MA_K, _MA_a, _MA_T, _tc, _MA_b, _MA_c)
+    _C   = calc_C_medio(st.session_state["ma_pct_urban"],
+                        st.session_state["ma_C_urb"],
+                        st.session_state["ma_C_rur"])
+    _Q   = calc_Q_racional(_C, _i, _MA_A)
+
+    # ── Painel de resultado central ─────────────────────────────────
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_res1, col_res2, col_res3, col_res4 = st.columns(4)
+
+    with col_res1:
+        st.metric("⏱ t_c (Kirpich)", f"{_tc:.2f} min", f"{_tc/60:.3f} h")
+    with col_res2:
+        st.metric("🌧 Intensidade i", f"{_i:.2f} mm/h",
+                  help="IDF · Foz do Iguaçu · PLUVIO 2.1")
+    with col_res3:
+        st.metric("📊 C médio ponderado", f"{_C:.3f}",
+                  f"{st.session_state['ma_pct_urban']}% urb / {100-st.session_state['ma_pct_urban']}% rur")
+    with col_res4:
+        st.markdown(
+            f'<div class="result-box">' +
+            f'<div class="label">Vazão de Pico — Q</div>' +
+            f'<div class="value">{_Q:.1f}<span class="unit">m³/s</span></div>' +
+            f'<div style="font-size:11px;opacity:0.8;margin-top:6px;">{_Q*1000:.0f} L/s</div>' +
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════════════════════════
+    # SEÇÃO C — GRÁFICO COMPARATIVO
+    # ══════════════════════════════════════════════════════════════════
+    st.markdown(
+        '<div class="section-divider"><hr/><span>Análise de Sensibilidade — Vazão vs. Urbanização</span><hr/></div>',
+        unsafe_allow_html=True,
+    )
+
+    col_graf, col_tab = st.columns([1.7, 1], gap="large")
+
+    pcts_graf = list(range(0, 101, 5))
+    Qs_graf   = [
+        calc_Q_racional(
+            calc_C_medio(p, st.session_state["ma_C_urb"], st.session_state["ma_C_rur"]),
+            _i, _MA_A
+        )
+        for p in pcts_graf
+    ]
+    cores_graf = [
+        "#0ea5e9" if p == st.session_state["ma_pct_urban"] else
+        ("#ef4444" if p >= 80 else
+         ("#f59e0b" if p >= 50 else "#bae6fd"))
+        for p in pcts_graf
+    ]
+
+    with col_graf:
+        fig_ma = go.Figure()
+
+        # Área sombreada de fundo por zona de risco
+        fig_ma.add_shape(type="rect", x0=-2.5, x1=30, y0=0, y1=max(Qs_graf)*1.05,
+                         fillcolor="rgba(16,185,129,0.06)", line_width=0, layer="below")
+        fig_ma.add_shape(type="rect", x0=30, x1=60, y0=0, y1=max(Qs_graf)*1.05,
+                         fillcolor="rgba(245,158,11,0.06)", line_width=0, layer="below")
+        fig_ma.add_shape(type="rect", x0=60, x1=102.5, y0=0, y1=max(Qs_graf)*1.05,
+                         fillcolor="rgba(239,68,68,0.06)", line_width=0, layer="below")
+
+        fig_ma.add_trace(go.Bar(
+            x=[f"{p}%" for p in pcts_graf],
+            y=Qs_graf,
+            marker_color=cores_graf,
+            marker_line_color="white",
+            marker_line_width=1,
+            hovertemplate="<b>%{x} urbanizado</b><br>Q = %{y:.2f} m³/s<extra></extra>",
+        ))
+
+        # Linha de referência — cenário atual
+        fig_ma.add_hline(
+            y=_Q, line_dash="dash", line_color="#0284c7", line_width=1.5,
+            annotation_text=f"Cenário atual: {_Q:.1f} m³/s",
+            annotation_position="top right",
+            annotation_font_color="#0284c7",
+            annotation_font_size=11,
+        )
+
+        fig_ma.update_layout(
+            **plotly_config(),
+            title=dict(
+                text=f"Q máximo × grau de urbanização — Tr = {_MA_T} anos · Foz do Iguaçu IDF",
+                font=dict(size=13, weight="bold"),
+            ),
+            xaxis=dict(title="Área urbanizada (%)", gridcolor="#e2e8f0", tickangle=-45),
+            yaxis=dict(title="Q (m³/s)", gridcolor="#e2e8f0"),
+            height=380,
+            showlegend=False,
+        )
+
+        # Anotações de zona
+        for xref, txt, cor in [
+            (0.07, "Baixo risco", "rgba(16,185,129,0.7)"),
+            (0.40, "Risco moderado", "rgba(245,158,11,0.7)"),
+            (0.78, "Alto risco", "rgba(239,68,68,0.7)"),
+        ]:
+            fig_ma.add_annotation(
+                xref="paper", yref="paper",
+                x=xref, y=0.97, text=txt,
+                showarrow=False,
+                font=dict(size=10, color=cor),
+                bgcolor="white",
+                bordercolor=cor, borderwidth=1, borderpad=3,
+            )
+
+        st.plotly_chart(fig_ma, use_container_width=True)
+
+    with col_tab:
+        st.markdown("**Tabela de sensibilidade**")
+        pcts_tab  = [0, 10, 20, 30, 35, 40, 50, 60, 70, 80, 90, 100]
+        rows_html = ""
+        for p in pcts_tab:
+            C_p = calc_C_medio(p, st.session_state["ma_C_urb"], st.session_state["ma_C_rur"])
+            Q_p = calc_Q_racional(C_p, _i, _MA_A)
+            ativo = p == st.session_state["ma_pct_urban"]
+            bg = "#e0f2fe" if ativo else "white"
+            fw = "700" if ativo else "400"
+            marker = " ◀" if ativo else ""
+            rows_html += (
+                f'<tr style="background:{bg};font-weight:{fw};">' +
+                f'<td style="padding:5px 10px;">{p}%</td>' +
+                f'<td style="padding:5px 10px;">{C_p:.3f}</td>' +
+                f'<td style="padding:5px 10px;">{Q_p:.1f}{marker}</td>' +
+                f'</tr>'
+            )
+        st.markdown(
+            '<div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">' +
+            '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+            '<thead><tr style="background:#f0f9ff;">' +
+            '<th style="padding:8px 10px;text-align:left;color:#0284c7;">% Urb.</th>' +
+            '<th style="padding:8px 10px;text-align:left;color:#0284c7;">C médio</th>' +
+            '<th style="padding:8px 10px;text-align:left;color:#0284c7;">Q (m³/s)</th>' +
+            '</tr></thead><tbody>' + rows_html + '</tbody></table></div>',
+            unsafe_allow_html=True,
+        )
+        _Q_nat = calc_Q_racional(calc_C_medio(0, st.session_state["ma_C_urb"], st.session_state["ma_C_rur"]), _i, _MA_A)
+        _Q_max = calc_Q_racional(calc_C_medio(100, st.session_state["ma_C_urb"], st.session_state["ma_C_rur"]), _i, _MA_A)
+        st.markdown(
+            f'<div class="alert-warning" style="margin-top:12px;">' +
+            f'<b>Δ Total:</b> de {_Q_nat:.1f} m³/s (0% urb.) ' +
+            f'para {_Q_max:.1f} m³/s (100% urb.) — ' +
+            f'variação de <b>+{((_Q_max/_Q_nat)-1)*100:.0f}%</b>.' +
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ══════════════════════════════════════════════════════════════════
+    # SEÇÃO D — MEMORIAL DE CÁLCULO
+    # ══════════════════════════════════════════════════════════════════
+    st.markdown(
+        '<div class="section-divider"><hr/><span>Memorial de Cálculo</span><hr/></div>',
+        unsafe_allow_html=True,
+    )
+
+    # Recompute com valores dinâmicos do slider para memorial
+    _C_mem  = calc_C_medio(st.session_state["ma_pct_urban"],
+                            st.session_state["ma_C_urb"],
+                            st.session_state["ma_C_rur"])
+    _Q_mem  = calc_Q_racional(_C_mem, _i, _MA_A)
+    _f_urb  = st.session_state["ma_pct_urban"] / 100.0
+    _f_rur  = 1.0 - _f_urb
+    _L077   = _MA_L ** 0.77
+    _S0385  = _MA_S ** 0.385
+    _Ta     = _MA_T ** _MA_a
+    _tcb_c  = (_tc + _MA_b) ** _MA_c
+
+    col_mem1, col_mem2 = st.columns(2, gap="large")
+
+    with col_mem1:
+        # PASSO 1
+        st.markdown('<div class="step-box">', unsafe_allow_html=True)
+        st.markdown('<div class="step-title">① Tempo de Concentração — Kirpich (1940)</div>', unsafe_allow_html=True)
+        st.latex(r"t_c = 0{,}0195 \cdot rac{L^{0{,}77}}{S^{0{,}385}}")
+        st.latex(
+            rf"t_c = 0{{,}}0195 \cdot rac{{{_MA_L:.0f}^{{0{{,}}77}}}}{{{_MA_S}^{{0{{,}}385}}}}"
+        )
+        st.latex(
+            rf"t_c = 0{{,}}0195 \cdot rac{{{_L077:.2f}}}{{{_S0385:.4f}}}"
+        )
+        st.latex(rf"t_c = {_tc:.4f} pprox {_tc:.2f} 	ext{{ min}}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # PASSO 2
+        st.markdown('<div class="step-box">', unsafe_allow_html=True)
+        st.markdown('<div class="step-title">② Intensidade de Chuva — IDF Foz do Iguaçu (PLUVIO 2.1)</div>', unsafe_allow_html=True)
+        st.latex(r"i = rac{K \cdot T^{a}}{(t_c + b)^{c}}")
+        st.latex(
+            rf"i = rac{{{_MA_K} \cdot {_MA_T}^{{{_MA_a}}}}}{{{{{_tc:.2f}}} + {_MA_b}}}^{{{_MA_c}}}"
+        )
+        st.latex(
+            rf"i = rac{{{_MA_K} \cdot {_Ta:.4f}}}{{{_tcb_c:.4f}}}"
+        )
+        st.latex(rf"i = {_i:.4f} pprox {_i:.2f} 	ext{{ mm/h}}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col_mem2:
+        # PASSO 3
+        st.markdown('<div class="step-box">', unsafe_allow_html=True)
+        st.markdown('<div class="step-title">③ Coeficiente de Escoamento Médio — C ponderado</div>', unsafe_allow_html=True)
+        st.latex(r"C_{med} = C_{urb} \cdot f_{urb} + C_{rur} \cdot f_{rur}")
+        st.latex(
+            rf"C_{{med}} = {st.session_state['ma_C_urb']:.2f} \cdot {_f_urb:.2f}"
+            rf" + {st.session_state['ma_C_rur']:.2f} \cdot {_f_rur:.2f}"
+        )
+        st.latex(
+            rf"C_{{med}} = {st.session_state['ma_C_urb']*_f_urb:.4f}"
+            rf" + {st.session_state['ma_C_rur']*_f_rur:.4f}"
+        )
+        st.latex(rf"C_{{med}} = {_C_mem:.4f}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # PASSO 4
+        st.markdown('<div class="step-box">', unsafe_allow_html=True)
+        st.markdown('<div class="step-title">④ Vazão de Pico — Método Racional</div>', unsafe_allow_html=True)
+        st.latex(r"Q = rac{C_{med} \cdot i \cdot A}{3{,}6} \quad [m^3/s]")
+        st.latex(
+            rf"Q = rac{{{_C_mem:.4f} \cdot {_i:.4f} \cdot {_MA_A}}}{{{3.6}}}"
+        )
+        st.latex(
+            rf"Q = rac{{{_C_mem * _i * _MA_A:.4f}}}{{3{{,}}6}}"
+        )
+        st.latex(rf"\boxed{{Q = {_Q_mem:.4f} \approx {_Q_mem:.2f} \; m^3/s}}")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Resultado final destacado
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="result-box">' +
+        f'<div class="label">Bacia do Rio Mathias Almada · Resultado Final · Tr = {_MA_T} anos</div>' +
+        f'<div class="value">{_Q_mem:.2f}<span class="unit">m³/s</span></div>' +
+        f'<div style="font-size:13px;opacity:0.85;margin-top:10px;">' +
+        f'tc = {_tc:.2f} min &nbsp;|&nbsp; i = {_i:.2f} mm/h &nbsp;|&nbsp; ' +
+        f'C = {_C_mem:.3f} &nbsp;|&nbsp; A = {_MA_A} km² &nbsp;|&nbsp; ' +
+        f'IDF: Foz do Iguaçu (PLUVIO 2.1)' +
+        f'</div></div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown("<br>", unsafe_allow_html=True)
+
+
+def _kpi_idf(param: str, val: str) -> str:
+    """Gera HTML de um mini-KPI para os coeficientes IDF."""
+    return (
+        f'<div style="text-align:center;flex:1;">' +
+        f'<div style="font-size:9.5px;font-weight:700;letter-spacing:0.1em;' +
+        f'text-transform:uppercase;color:#0284c7;">{param}</div>' +
+        f'<div style="font-size:19px;font-weight:900;color:#0f172a;letter-spacing:-0.5px;">{val}</div>' +
+        '</div>'
+    )
+
 # ──────────────────────────────────────────────────────────────────────────────
 # ROTEADOR PRINCIPAL
 # ──────────────────────────────────────────────────────────────────────────────
-if st.session_state.get("pagina_ativa", "estudo") == "estudo":
+_pag = st.session_state.get("pagina_ativa", "estudo")
+if _pag == "estudo":
     render_page_estudo()
+elif _pag == "mathias":
+    render_page_mathias()
 else:
     render_page_simulador()
